@@ -1,0 +1,211 @@
+{
+  "app_name": "Manajemen Izin & Kegiatan Pegawai",
+  "personality": "1 iOS-Native Clean",
+  "personality_one_liner": "A trustworthy, highly readable, and cleanly structured HR tool where the content and forms are the heroes, wrapped in a calming sage green palette.",
+  "color": {
+    "surface": "#F9F9F8",
+    "onSurface": "#1C1C1E",
+    "surfaceSecondary": "#FFFFFF",
+    "onSurfaceSecondary": "#1C1C1E",
+    "surfaceTertiary": "#F0F0EE",
+    "onSurfaceTertiary": "#3A3A3C",
+    "surfaceInverse": "#2C4C3B",
+    "onSurfaceInverse": "#FFFFFF",
+    "brand": "#2C4C3B",
+    "onBrand": "#FFFFFF",
+    "brandPrimary": "#2C4C3B",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#4A7055",
+    "onBrandSecondary": "#FFFFFF",
+    "brandTertiary": "#E6EFE9",
+    "onBrandTertiary": "#21392C",
+    "success": "#347A50",
+    "onSuccess": "#FFFFFF",
+    "warning": "#D68C38",
+    "onWarning": "#FFFFFF",
+    "error": "#CC4B37",
+    "onError": "#FFFFFF",
+    "info": "#505A61",
+    "onInfo": "#FFFFFF",
+    "border": "#E3E3E0",
+    "borderStrong": "#C7C7C5",
+    "divider": "#EFEFEF",
+    "muted": "#737375"
+  },
+  "color_dark": {
+    "surface": "#0C0C0C",
+    "onSurface": "#F2F2F2",
+    "surfaceSecondary": "#1A1A1A",
+    "onSurfaceSecondary": "#F2F2F2",
+    "surfaceTertiary": "#262626",
+    "onSurfaceTertiary": "#CCCCCC",
+    "surfaceInverse": "#D1E3D8",
+    "onSurfaceInverse": "#122118",
+    "brand": "#A3C2B1",
+    "onBrand": "#122118",
+    "brandPrimary": "#A3C2B1",
+    "onBrandPrimary": "#122118",
+    "brandSecondary": "#83A58E",
+    "onBrandSecondary": "#0A140F",
+    "brandTertiary": "#23382B",
+    "onBrandTertiary": "#D1E3D8",
+    "success": "#4A9D6A",
+    "onSuccess": "#FFFFFF",
+    "warning": "#E0A352",
+    "onWarning": "#FFFFFF",
+    "error": "#E56B5A",
+    "onError": "#FFFFFF",
+    "info": "#7A8B99",
+    "onInfo": "#FFFFFF",
+    "border": "#333333",
+    "borderStrong": "#4D4D4D",
+    "divider": "#262626",
+    "muted": "#8C8C8C"
+  },
+  "typography": {
+    "displayFontFamily": "Plus Jakarta Sans",
+    "textFontFamily": "Plus Jakarta Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous vertical breathing room for forms. Cards never flush to screen edge. Bottom sticky CTAs must have safe-area padding.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "1",
+  "navigation": "bottom_tabs",
+  "icon_set": "Feather",
+  "glassmorphism": {
+    "enabled": "true",
+    "do's": [
+      "Apply to sticky headers over scrolling content",
+      "Apply to bottom tab bar",
+      "Apply to floating action buttons (FAB) over brandTertiary tint"
+    ],
+    "dont's": [
+      "Do not apply to form fields or list rows",
+      "Do not apply to general body content cards"
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Login",
+      "purpose": "Role gate to select between Employee or Admin.",
+      "states": {
+        "loading": "Centered spinner",
+        "empty": "N/A",
+        "error": "Error toast or inline message for wrong PIN"
+      },
+      "layout": "Clean split screen or two large touch targets for 'Pegawai' (Employee) and 'Admin'. If Pegawai is selected, show a searchable list of employee names/avatars to 'login' as. If Admin is selected, show a clean PIN pad (Numpad) layout."
+    },
+    {
+      "name": "Beranda (Dashboard)",
+      "purpose": "Personal summary for employees (leave balances, recent history) or high-level pending approvals for Admins.",
+      "states": {
+        "loading": "Skeleton loaders for summary cards",
+        "empty": "Illustration for 'No recent requests' with a 'brandTertiary' tinted background.",
+        "error": "Centered readable message with a 'Retry' button"
+      },
+      "layout": "Hero section at top using the hero_background with an overlaid gradient scrim and greeting text. Below: A segmented control or horizontal scroll of summary cards (e.g., 'Sisa Cuti', 'Izin'). Below that: A vertical list of recent 'Riwayat' (History) items with status badges (Pending/Approved/Rejected). Glass bottom tab bar."
+    },
+    {
+      "name": "Form Izin (Leave Request)",
+      "purpose": "Allows employees to log sick leave, vacation, or general permission.",
+      "states": {
+        "loading": "Spinner over the submit button",
+        "empty": "N/A",
+        "error": "Validation error text below missing fields"
+      },
+      "layout": "Single column form. Top: Segmented control for Type (Sakit, Cuti, Izin). Middle: Date picker rows (Start & End). Bottom: Notes textarea. The 'Ajukan' (Submit) button is sticky at the bottom inside a KeyboardAvoidingView with safe-area padding."
+    },
+    {
+      "name": "Form Kegiatan Luar (Outdoor Activity)",
+      "purpose": "Log outdoor activities with location details.",
+      "states": {
+        "loading": "Spinner over submit button",
+        "empty": "N/A",
+        "error": "Validation error text below missing fields"
+      },
+      "layout": "Single column form. Inputs for Activity Name, Date, Location (Text), and Notes. Submit button sticky at the bottom. Use generous 'lg' or 'xl' vertical spacing between form groups."
+    },
+    {
+      "name": "Laporan & Kelola (Admin Reports & Manage)",
+      "purpose": "Admin view to manage employees/activities and view aggregated counts.",
+      "states": {
+        "loading": "List skeleton",
+        "empty": "Empty state illustration if no employees exist",
+        "error": "Standard error state with retry"
+      },
+      "layout": "Top sticky segmented control ('Tidak Hadir' vs 'Kegiatan Luar'). The list below shows Employee rows. Each row has the employee avatar (using initials if no image), name, and a prominent badge/counter showing the aggregate count. A floating action button (FAB) with glass effect to add new employees or activities."
+    }
+  ],
+  "images": {
+    "hero_background": {
+      "url": "https://images.unsplash.com/photo-1675251171768-5d49233cc410?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMHNhZ2UlMjBncmVlbiUyMG1pbmltYWwlMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc4OTA5Mjg1NXww&ixlib=rb-4.1.0&q=85",
+      "dark": "https://images.unsplash.com/photo-1689443111287-5c2e129ec756?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHwyfHxhYnN0cmFjdCUyMHNhZ2UlMjBncmVlbiUyMG1pbmltYWwlMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc4OTA5Mjg1NXww&ixlib=rb-4.1.0&q=85",
+      "alt": "Abstract sage green minimal curves"
+    },
+    "employee_avatar_1": {
+      "url": "https://images.unsplash.com/photo-1758691737605-69a0e78bd193?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwzfHxwcm9mZXNzaW9uYWwlMjBhc2lhbiUyMG9mZmljZSUyMHdvcmtlciUyMHBvcnRyYWl0fGVufDB8fHx8MTc4OTA5Mjg1NXww&ixlib=rb-4.1.0&q=85",
+      "alt": "Smiling woman with glasses"
+    },
+    "employee_avatar_2": {
+      "url": "https://images.unsplash.com/photo-1544168190-79c17527004f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBhc2lhbiUyMG9mZmljZSUyMHdvcmtlciUyMHBvcnRyYWl0fGVufDB8fHx8MTc4OTA5Mjg1NXww&ixlib=rb-4.1.0&q=85",
+      "alt": "Man in a light blue denim shirt"
+    },
+    "employee_avatar_3": {
+      "url": "https://images.unsplash.com/photo-1581065178047-8ee15951ede6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwyfHxwcm9mZXNzaW9uYWwlMjBhc2lhbiUyMG9mZmljZSUyMHdvcmtlciUyMHBvcnRyYWl0fGVufDB8fHx8MTc4OTA5Mjg1NXww&ixlib=rb-4.1.0&q=85",
+      "alt": "Woman in black blazer smiling"
+    },
+    "building_exterior": {
+      "url": "https://images.unsplash.com/photo-1691425700573-5e2e6e4f6157?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODF8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBvZmZpY2UlMjBidWlsZGluZyUyMGV4dGVyaW9yJTIwYnVpbGRpbmd8ZW58MHx8fHwxNzg5MDkyODU1fDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Modern office building exterior"
+    }
+  },
+  "haptics": {
+    "primary_button_press": "impactMedium",
+    "tab_change": "selection",
+    "segmented_control_switch": "selection",
+    "form_submit_success": "notificationSuccess",
+    "form_submit_error": "notificationError",
+    "pull_to_refresh": "impactLight"
+  },
+  "instructions_to_main_agent": [
+    "Ensure the hero image on the Beranda (Dashboard) screen includes the mandatory gradient-to-dark scrim pattern (Layer 0: expo-image, Layer 1: expo-linear-gradient from transparent to surfaceInverse, Layer 2: greeting text/stats).",
+    "Implement both Light and Dark mode using the provided color sets (`color` and `color_dark`). The `surfaceInverse` is carefully selected to ensure text readability on the hero scrim in both modes.",
+    "Form Submit CTA buttons MUST be sticky at the bottom of the screen, wrapping the scrollview in a KeyboardAvoidingView and reserving bottom safe-area space so they are always reachable.",
+    "Do not use indigo, blue, or purple anywhere in the UI. The theme strictly adheres to a botanical/sage green palette (`#2C4C3B` for brand) to convey trust, growth, and permission approval.",
+    "Use 'Plus Jakarta Sans' strictly with weights 400 and 500 ONLY. Hierarchy should be created through font size variations (e.g., lg, xl, 2xl) and text colors (onSurface vs muted), not through bolding.",
+    "Status badges for leaves (Pending/Approved/Rejected) should use the respective success/warning/error colors on a surfaceTertiary or tinted background, keeping text fully legible (WCAG AA).",
+    "Wire haptics natively for all primary actions (e.g., submitting a leave request) as described in the haptics block."
+  ]
+}
