@@ -1,6 +1,7 @@
+import { Feather } from "@react-native-vector-icons/feather";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { FlatList, RefreshControl, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api } from "@/src/api";
@@ -9,18 +10,36 @@ import { makeStyles, useTheme } from "@/src/theme";
 
 type Tab = "absences" | "activities";
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+const MONTHS_FULL = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+];
+
 export default function Laporan() {
   const styles = useStyles();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>("absences");
+  const [year, setYear] = useState<number>(new Date().getFullYear());
+  const [month, setMonth] = useState<number | null>(null); // null = seluruh tahun
 
-  const absQuery = useQuery({ queryKey: ["report-absences"], queryFn: api.reportAbsences });
-  const actQuery = useQuery({ queryKey: ["report-activities"], queryFn: api.reportActivities });
+  const params = { year, month: month ?? undefined };
+
+  const absQuery = useQuery({
+    queryKey: ["report-absences", year, month],
+    queryFn: () => api.reportAbsences(params),
+  });
+  const actQuery = useQuery({
+    queryKey: ["report-activities", year, month],
+    queryFn: () => api.reportActivities(params),
+  });
 
   const isAbs = tab === "absences";
   const activeQuery = isAbs ? absQuery : actQuery;
   const rows = (activeQuery.data ?? []) as any[];
+
+  const periodText = month === null ? `Tahun ${year}` : `${MONTHS_FULL[month - 1]} ${year}`;
 
   return (
     <View style={styles.container}>
@@ -38,6 +57,54 @@ export default function Laporan() {
             ]}
           />
         </View>
+
+        <View style={styles.yearRow}>
+          <Pressable
+            style={styles.yearBtn}
+            onPress={() => setYear((y) => y - 1)}
+            testID="year-prev"
+          >
+            <Feather name="chevron-left" size={20} color={colors.brandPrimary} />
+          </Pressable>
+          <Text style={styles.yearText} testID="year-value">
+            {year}
+          </Text>
+          <Pressable
+            style={styles.yearBtn}
+            onPress={() => setYear((y) => y + 1)}
+            testID="year-next"
+          >
+            <Feather name="chevron-right" size={20} color={colors.brandPrimary} />
+          </Pressable>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.monthRow}
+          style={styles.monthScroll}
+        >
+          <Pressable
+            style={[styles.monthChip, month === null && styles.monthChipActive]}
+            onPress={() => setMonth(null)}
+            testID="month-all"
+          >
+            <Text style={[styles.monthText, month === null && styles.monthTextActive]}>Semua</Text>
+          </Pressable>
+          {MONTHS.map((m, i) => {
+            const active = month === i + 1;
+            return (
+              <Pressable
+                key={m}
+                style={[styles.monthChip, active && styles.monthChipActive]}
+                onPress={() => setMonth(i + 1)}
+                testID={`month-${i + 1}`}
+              >
+                <Text style={[styles.monthText, active && styles.monthTextActive]}>{m}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </View>
 
       <FlatList
@@ -54,9 +121,9 @@ export default function Laporan() {
         }
         ListHeaderComponent={
           <Text style={styles.caption}>
-            {isAbs
+            {(isAbs
               ? "Jumlah hari tidak hadir masuk kerja (izin disetujui)"
-              : "Jumlah kegiatan luar gedung (disetujui)"}
+              : "Jumlah kegiatan luar gedung (disetujui)") + ` · ${periodText}`}
           </Text>
         }
         ListEmptyComponent={
@@ -101,6 +168,38 @@ const useStyles = makeStyles((colors) => ({
   },
   title: { fontSize: 24, color: colors.onSurface, fontWeight: "500" },
   subtitle: { fontSize: 14, color: colors.muted, marginTop: 2 },
+  yearRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 20,
+    marginTop: 14,
+  },
+  yearBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.brandTertiary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  yearText: { fontSize: 20, color: colors.onSurface, fontWeight: "500", minWidth: 64, textAlign: "center" },
+  monthScroll: { marginTop: 12, marginHorizontal: -20 },
+  monthRow: { gap: 8, paddingHorizontal: 20 },
+  monthChip: {
+    flexShrink: 0,
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surfaceTertiary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  monthChipActive: { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary },
+  monthText: { fontSize: 14, color: colors.onSurfaceTertiary },
+  monthTextActive: { color: colors.onBrandPrimary },
   caption: { fontSize: 13, color: colors.muted, marginBottom: 8 },
   row: {
     flexDirection: "row",

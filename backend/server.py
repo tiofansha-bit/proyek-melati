@@ -297,11 +297,26 @@ def _days_between(start: str, end: str) -> int:
         return 1
 
 
+def _in_period(date_str: str, year: Optional[int], month: Optional[int]) -> bool:
+    if year is None and month is None:
+        return True
+    try:
+        d = date.fromisoformat(date_str)
+    except Exception:
+        return False
+    if year is not None and d.year != year:
+        return False
+    if month is not None and d.month != month:
+        return False
+    return True
+
+
 @api_router.get("/reports/absences")
-async def report_absences():
+async def report_absences(year: Optional[int] = None, month: Optional[int] = None):
     """Jumlah tidak hadir masuk kerja (hari) per pegawai — dari izin approved."""
     employees = await db.employees.find({"deleted_at": None}, NO_ID).to_list(1000)
     leaves = await db.leaves.find({"deleted_at": None, "status": "approved"}, NO_ID).to_list(5000)
+    leaves = [lv for lv in leaves if _in_period(lv["start_date"], year, month)]
     by_emp: dict = {}
     for lv in leaves:
         eid = lv["employee_id"]
@@ -323,10 +338,11 @@ async def report_absences():
 
 
 @api_router.get("/reports/activities")
-async def report_activities():
+async def report_activities(year: Optional[int] = None, month: Optional[int] = None):
     """Jumlah kegiatan luar per pegawai — dari kegiatan approved."""
     employees = await db.employees.find({"deleted_at": None}, NO_ID).to_list(1000)
     logs = await db.activity_logs.find({"deleted_at": None, "status": "approved"}, NO_ID).to_list(5000)
+    logs = [lg for lg in logs if _in_period(lg["date"], year, month)]
     by_emp: dict = {}
     for lg in logs:
         eid = lg["employee_id"]

@@ -1,5 +1,14 @@
 const BASE = process.env.EXPO_PUBLIC_BACKEND_URL;
 
+function qs(params?: Record<string, string | number | undefined>): string {
+  if (!params) return "";
+  const entries = Object.entries(params).filter(
+    ([, v]) => v !== undefined && v !== null && v !== "",
+  );
+  if (entries.length === 0) return "";
+  return "?" + entries.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join("&");
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}/api${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -126,6 +135,8 @@ export const api = {
   getPending: () =>
     request<{ leaves: Leave[]; activities: ActivityLog[] }>("/pending"),
 
-  reportAbsences: () => request<AbsenceReport[]>("/reports/absences"),
-  reportActivities: () => request<ActivityReport[]>("/reports/activities"),
+  reportAbsences: (params?: { year?: number; month?: number }) =>
+    request<AbsenceReport[]>(`/reports/absences${qs(params)}`),
+  reportActivities: (params?: { year?: number; month?: number }) =>
+    request<ActivityReport[]>(`/reports/activities${qs(params)}`),
 };
