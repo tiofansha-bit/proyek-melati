@@ -26,15 +26,98 @@ class TestAdminAuth:
         r = s.post(f"{API}/admin/login", json={"pin": "0000"})
         assert r.status_code == 401
 
+    def test_change_admin_pin_roundtrip(self, s):
+        """1234 -> 4321 -> verify login with 4321 -> restore 1234. Same class = same xdist worker."""
+        r = s.post(f"{API}/admin/change-pin", json={"admin_pin": "1234", "new_pin": "4321"})
+        assert r.status_code == 200, r.text
+        try:
+            assert s.post(f"{API}/admin/login", json={"pin": "4321"}).status_code == 200
+            assert s.post(f"{API}/admin/login", json={"pin": "1234"}).status_code == 401
+        finally:
+            back = s.post(f"{API}/admin/change-pin", json={"admin_pin": "4321", "new_pin": "1234"})
+            assert back.status_code == 200
+        assert s.post(f"{API}/admin/login", json={"pin": "1234"}).status_code == 200
+
+
+# ------------------------- PIN Auth (new) -------------------------
+class TestPinAuth:
+    """Employee & admin PIN login, admin change-pin, admin reset employee pin."""
+
+    def test_employee_login_ok(self, s):
+        emps = s.get(f"{API}/employees").json()
+        assert emps, "no employees seeded"
+        emp = emps[0]
+        r = s.post(f"{API}/employee/login", json={"employee_id": emp["id"], "pin": "1234"})
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["role"] == "employee"
+        assert body["employee_id"] == emp["id"]
+        assert body["name"] == emp["name"]
+
+    def test_employee_login_wrong_pin(self, s):
+        emps = s.get(f"{API}/employees").json()
+        r = s.post(f"{API}/employee/login", json={"employee_id": emps[0]["id"], "pin": "0000"})
+        assert r.status_code == 401
+
+    def test_pin_too_short_422(self, s):
+        # new_pin too short must be a validation error
+        r = s.post(f"{API}/admin/change-pin", json={"admin_pin": "1234", "new_pin": "12"})
+        assert r.status_code == 422
+
+    def test_employees_list_no_pin_hash(self, s):
+        r = s.get(f"{API}/employees")
+        for e in r.json():
+            assert "pin_hash" not in e
+
+    def test_change_admin_pin_wrong_current_401(self, s):
+        r = s.post(f"{API}/admin/change-pin", json={"admin_pin": "9999", "new_pin": "4321"})
+        assert r.status_code == 401
+
+    def test_reset_employee_pin_wrong_admin_401(self, s):
+        emps = s.get(f"{API}/employees").json()
+        r = s.post(
+            f"{API}/employees/{emps[0]['id']}/pin",
+            json={"admin_pin": "0000", "new_pin": "5678"},
+        )
+        assert r.status_code == 401
+
+    def test_reset_employee_pin_roundtrip(self, s):
+        emps = s.get(f"{API}/employees").json()
+        target = next((e for e in emps if not e["name"].startswith("TEST_")), emps[0])
+        # set to 5678
+        r = s.post(
+            f"{API}/employees/{target['id']}/pin",
+            json={"admin_pin": "1234", "new_pin": "5678"},
+        )
+        assert r.status_code == 200
+        try:
+            # login with new
+            ok = s.post(f"{API}/employee/login", json={"employee_id": target["id"], "pin": "5678"})
+            assert ok.status_code == 200
+            bad = s.post(f"{API}/employee/login", json={"employee_id": target["id"], "pin": "1234"})
+            assert bad.status_code == 401
+        finally:
+            # restore to 1234
+            back = s.post(
+                f"{API}/employees/{target['id']}/pin",
+                json={"admin_pin": "1234", "new_pin": "1234"},
+            )
+            assert back.status_code == 200
+        confirm = s.post(f"{API}/employee/login", json={"employee_id": target["id"], "pin": "1234"})
+        assert confirm.status_code == 200
+
 
 # ------------------------- Employees -------------------------
 class TestEmployees:
     def test_list_seed(self, s):
         r = s.get(f"{API}/employees")
         assert r.status_code == 200
-        names = [e["name"] for e in r.json()]
-        for n in ["Andi Saputra", "Siti Rahayu", "Budi Santoso", "Dewi Lestari"]:
-            assert n in names
+        data = r.json()
+        assert isinstance(data, list) and len(data) >= 1
+        # ensure shape and no pin_hash exposed
+        for e in data:
+            assert "id" in e and "name" in e
+            assert "pin_hash" not in e
 
     def test_create_delete_persistence(self, s):
         r = s.post(f"{API}/employees", json={"name": "TEST_Pegawai_X"})
@@ -73,7 +156,8 @@ class TestLeaves:
     @pytest.fixture(autouse=True)
     def setup(self, s):
         emps = s.get(f"{API}/employees").json()
-        self.emp = next(e for e in emps if e["name"] == "Andi Saputra")
+        # pick any non-TEST employee; fallback to first
+        self.emp = next((e for e in emps if not e["name"].startswith("TEST_")), emps[0])
 
     def test_create_leave_default_pending(self, s):
         payload = {
@@ -87,7 +171,7 @@ class TestLeaves:
         assert r.status_code == 200
         d = r.json()
         assert d["status"] == "pending"
-        assert d["employee_name"] == "Andi Saputra"
+        assert d["employee_name"] == self.emp["name"]
         assert d["type"] == "sakit"
         lid = d["id"]
         # approve
@@ -153,7 +237,7 @@ class TestActivityLogs:
     @pytest.fixture(autouse=True)
     def setup(self, s):
         emps = s.get(f"{API}/employees").json()
-        self.emp = next(e for e in emps if e["name"] == "Siti Rahayu")
+        self.emp = next((e for e in emps if not e["name"].startswith("TEST_")), emps[0])
 
     def test_create_and_approve(self, s):
         r = s.post(

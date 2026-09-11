@@ -1,0 +1,33 @@
+{
+  "summary": "Retest for PIN auth feature + logout bug fix. Backend: 23/23 pytest tests pass (7 new PIN auth tests added: employee login OK/wrong, PIN 4-12 digit validation 422, /api/employees has no pin_hash, admin change-pin wrong-current 401, change-pin 1234->4321 roundtrip incl. restore, reset-employee-pin wrong-admin 401, reset-employee-pin roundtrip incl. restore). Frontend (Expo web, mobile 390x844): Logout bug FIXED — employee logout from Beranda AND admin logout from Persetujuan both return to role-select screen. Employee PIN flow: wrong PIN keeps user on PIN screen with toast, PIN 1234 signs in. Admin PIN: wrong 0000 stays on screen, 1234 signs in. Admin change-own-PIN dialog (pin-dialog with fields pin-field-current + pin-field-next) works: 1234->4321, verified login with 4321, restored to 1234. Admin reset-employee-PIN via Kelola > reset-pin-<id> (dialog uses single pin-field-pin) works: set 5678, verified employee login with 5678, restored to 1234. All admin/employee credentials restored to 1234 at end (confirmed via curl: admin_login=200, employee_login_1234=200).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin tabs (Laporan/Kelola)", "issues": ["Logout button hanya ada di header tab Persetujuan; jika user di Laporan/Kelola dan ingin keluar harus balik dulu ke Persetujuan. Bukan bug (sesuai request), tapi consider consistent header/logout across admin tabs."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Backend uses bcrypt_sha256 (passlib) — good, avoids 72-byte truncation, timing-safe verify with DUMMY_HASH when hash missing.",
+    "Admin PIN bootstrap into settings/_id=auth is idempotent (only inserts if missing) — safe on redeploy.",
+    "employees list projection excludes _id and never returns pin_hash — verified by test.",
+    "PIN validation uses Pydantic field_validator with proper 4-12 digit rule; short PIN returns 422 not 400 (FastAPI/Pydantic default) — acceptable.",
+    "Frontend admin PIN stored in secure storage under key admin_pin; cleared on signOut (auth.tsx line 54) — correct.",
+    "Guard <Redirect href='/'> in employee/_layout.tsx & admin/_layout.tsx runs after ready && session.role !== 'employee'/'admin' — properly handles logout AND direct navigation without race with initial hydration.",
+    "Minor: xdist parallel test flakiness fixed by grouping admin change-pin roundtrip with admin login tests in same class (loadscope pins class to worker)."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "No new seed data added. During UI test, employee 303564ab-fa82-4380-97a5-7100a6d57ed7 PIN was temporarily 5678 then restored to 1234 via curl (verified 200/200). Admin PIN restored to 1234 via UI + verified 200.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Admin PIN=1234, all employees PIN=1234 (restored). Endpoints tested at /app/backend/tests/backend_test.py (23 tests). Pytest config: xdist -n 2 --dist loadscope — keep admin PIN roundtrip in TestAdminAuth class to avoid worker races. To run serially use `pytest -n 0`. Logout button testID=logout-button exists only on Beranda (employee) and Persetujuan (admin) headers.",
+  "rca_of_issue": "Logout bug RCA (prior): signOut cleared session state but tabs remained mounted because there was no session guard in employee/_layout.tsx or admin/_layout.tsx; navigation stayed on the tab. Fix: both layouts add `if (ready && session?.role !== 'employee'/'admin') return <Redirect href='/' />` which unmounts tabs and sends user back to login when session becomes null. Verified end-to-end for both roles."
+}

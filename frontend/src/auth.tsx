@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type PropsWithChildren } from "react";
 
+import { ADMIN_PIN_KEY } from "@/src/api";
 import { storage } from "@/src/utils/storage";
 
 export type Role = "employee" | "admin";
@@ -15,7 +16,7 @@ type AuthContextValue = {
   session: Session | null;
   ready: boolean;
   signInEmployee: (employeeId: string, name: string, avatarUrl?: string | null) => Promise<void>;
-  signInAdmin: () => Promise<void>;
+  signInAdmin: (pin: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -41,7 +42,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setSession(s);
   };
 
-  const signInAdmin = async () => {
+  const signInAdmin = async (pin: string) => {
+    await storage.secureSet(ADMIN_PIN_KEY, pin);
     const s: Session = { role: "admin" };
     await storage.setItem(SESSION_KEY, s);
     setSession(s);
@@ -49,6 +51,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const signOut = async () => {
     await storage.removeItem(SESSION_KEY);
+    await storage.secureRemove(ADMIN_PIN_KEY);
     setSession(null);
   };
 

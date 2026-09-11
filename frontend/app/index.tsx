@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { api } from "@/src/api";
+import { api, type Employee } from "@/src/api";
 import { useAuth } from "@/src/auth";
 import { useToast } from "@/src/components/toast";
 import { Avatar, Button } from "@/src/components/ui";
@@ -34,6 +34,9 @@ export default function Login() {
   const [search, setSearch] = useState("");
   const [pin, setPin] = useState("");
   const [checking, setChecking] = useState(false);
+  const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
+  const [empPin, setEmpPin] = useState("");
+  const [empChecking, setEmpChecking] = useState(false);
 
   const employeesQuery = useQuery({
     queryKey: ["employees"],
@@ -59,12 +62,26 @@ export default function Login() {
     setChecking(true);
     try {
       await api.adminLogin(pin);
-      await signInAdmin();
+      await signInAdmin(pin);
       router.replace("/admin");
     } catch (e: any) {
       toast(e.message || "PIN salah", "error");
     } finally {
       setChecking(false);
+    }
+  };
+
+  const handleEmployeeLogin = async () => {
+    if (!selectedEmp) return;
+    setEmpChecking(true);
+    try {
+      await api.employeeLogin(selectedEmp.id, empPin);
+      await signInEmployee(selectedEmp.id, selectedEmp.name, selectedEmp.avatar_url);
+      router.replace("/employee");
+    } catch (e: any) {
+      toast(e.message || "PIN salah", "error");
+    } finally {
+      setEmpChecking(false);
     }
   };
 
@@ -116,9 +133,14 @@ export default function Login() {
             </View>
           ) : null}
 
-          {mode === "employee" ? (
+          {mode === "employee" && !selectedEmp ? (
             <View style={styles.section}>
-              <BackLink onPress={() => setMode("select")} />
+              <BackLink
+                onPress={() => {
+                  setMode("select");
+                  setSearch("");
+                }}
+              />
               <Text style={styles.sectionTitle}>Pilih nama Anda</Text>
               <View style={styles.searchBox}>
                 <Feather name="search" size={18} color={colors.muted} />
@@ -141,9 +163,9 @@ export default function Login() {
                     key={emp.id}
                     style={styles.empRow}
                     testID={`employee-pick-${emp.id}`}
-                    onPress={async () => {
-                      await signInEmployee(emp.id, emp.name, emp.avatar_url);
-                      router.replace("/employee");
+                    onPress={() => {
+                      setSelectedEmp(emp);
+                      setEmpPin("");
                     }}
                   >
                     <Avatar name={emp.name} url={emp.avatar_url} size={44} />
@@ -152,6 +174,38 @@ export default function Login() {
                   </Pressable>
                 ))
               )}
+            </View>
+          ) : null}
+
+          {mode === "employee" && selectedEmp ? (
+            <View style={styles.section}>
+              <BackLink onPress={() => setSelectedEmp(null)} />
+              <View style={styles.selectedEmp}>
+                <Avatar name={selectedEmp.name} url={selectedEmp.avatar_url} size={56} />
+                <Text style={styles.selectedName}>{selectedEmp.name}</Text>
+                <Text style={styles.hint}>Masukkan PIN Anda</Text>
+              </View>
+              <TextInput
+                style={styles.pinInput}
+                placeholder="••••"
+                placeholderTextColor={colors.muted}
+                value={empPin}
+                onChangeText={setEmpPin}
+                keyboardType="number-pad"
+                secureTextEntry
+                maxLength={12}
+                autoFocus
+                testID="employee-pin-input"
+              />
+              <Text style={styles.hint}>PIN default: 1234</Text>
+              <Button
+                label="Masuk"
+                onPress={handleEmployeeLogin}
+                loading={empChecking}
+                disabled={empPin.length < 4}
+                testID="employee-login-button"
+                style={{ marginTop: 8 }}
+              />
             </View>
           ) : null}
 
@@ -257,6 +311,8 @@ const useStyles = makeStyles((colors) => ({
   },
   empName: { flex: 1, fontSize: 16, color: colors.onSurface, fontWeight: "500" },
   emptyText: { fontSize: 14, color: colors.muted, textAlign: "center", marginTop: 24 },
+  selectedEmp: { alignItems: "center", gap: 8, marginVertical: 8 },
+  selectedName: { fontSize: 20, color: colors.onSurface, fontWeight: "500" },
   pinInput: {
     backgroundColor: colors.surfaceTertiary,
     borderRadius: 12,

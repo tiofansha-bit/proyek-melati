@@ -5,10 +5,11 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Literal
 import uuid
 from datetime import datetime, timezone, date
+from passlib.context import CryptContext
 
 
 ROOT_DIR = Path(__file__).parent
@@ -20,6 +21,42 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 ADMIN_PIN = os.environ.get('ADMIN_PIN', '1234')
+DEFAULT_EMPLOYEE_PIN = '1234'
+
+# One central bcrypt context. bcrypt_sha256 avoids the 72-byte limit.
+pwd_context = CryptContext(schemes=["bcrypt_sha256"], deprecated="auto", bcrypt_sha256__rounds=12)
+DUMMY_HASH = pwd_context.hash("00000000")
+
+
+def validate_pin(value: str) -> str:
+    if not value.isascii() or not value.isdigit() or not 4 <= len(value) <= 12:
+        raise ValueError("PIN harus 4-12 digit angka")
+    return value
+
+
+def hash_pin(pin: str) -> str:
+    return pwd_context.hash(validate_pin(pin))
+
+
+def verify_pin(plain: str, stored_hash: Optional[str]) -> bool:
+    # Always run a verify (against a dummy hash when missing) to reduce timing enumeration.
+    if not stored_hash:
+        pwd_context.verify(plain, DUMMY_HASH)
+        return False
+    try:
+        return pwd_context.verify(plain, stored_hash)
+    except Exception:
+        return False
+
+
+async def get_admin_hash() -> Optional[str]:
+    doc = await db.settings.find_one({"_id": "auth"}, {"_id": 0, "admin_pin_hash": 1})
+    return doc.get("admin_pin_hash") if doc else None
+
+
+async def require_admin_pin(admin_pin: str):
+    if not verify_pin(admin_pin, await get_admin_hash()):
+        raise HTTPException(status_code=401, detail="PIN admin salah")
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -41,6 +78,7 @@ class Employee(BaseModel):
 class EmployeeCreate(BaseModel):
     name: str
     avatar_url: Optional[str] = None
+    pin: Optional[str] = None  # PIN awal; default 1234 bila kosong
 
 
 class Activity(BaseModel):
@@ -110,6 +148,31 @@ class AdminLogin(BaseModel):
     pin: str
 
 
+class EmployeeLogin(BaseModel):
+    employee_id: str
+    pin: str
+
+
+class ChangeAdminPin(BaseModel):
+    admin_pin: str
+    new_pin: str
+
+    @field_validator("new_pin")
+    @classmethod
+    def _valid(cls, v):
+        return validate_pin(v)
+
+
+class SetEmployeePin(BaseModel):
+    admin_pin: str
+    new_pin: str
+
+    @field_validator("new_pin")
+    @classmethod
+    def _valid(cls, v):
+        return validate_pin(v)
+
+
 NO_ID = {"_id": 0}
 
 
@@ -120,8 +183,34 @@ async def get_employee(employee_id: str) -> Optional[dict]:
 # ------------------------- Auth -------------------------
 @api_router.post("/admin/login")
 async def admin_login(payload: AdminLogin):
-    if payload.pin != ADMIN_PIN:
+    if not verify_pin(payload.pin, await get_admin_hash()):
+        raise HTTPException(status_code=401, detail="PIN admin salah")
+    return {"ok": True}
+
+
+@api_router.post("/employee/login")
+async def employee_login(payload: EmployeeLogin):
+    emp = await db.employees.find_one(
+        {"id": payload.employee_id, "deleted_at": None}, {"_id": 0}
+    )
+    if not emp or not verify_pin(payload.pin, emp.get("pin_hash")):
         raise HTTPException(status_code=401, detail="PIN salah")
+    return {
+        "role": "employee",
+        "employee_id": emp["id"],
+        "name": emp["name"],
+        "avatar_url": emp.get("avatar_url"),
+    }
+
+
+@api_router.post("/admin/change-pin")
+async def change_admin_pin(payload: ChangeAdminPin):
+    await require_admin_pin(payload.admin_pin)
+    await db.settings.update_one(
+        {"_id": "auth"},
+        {"$set": {"admin_pin_hash": hash_pin(payload.new_pin), "updated_at": now_iso()}},
+        upsert=True,
+    )
     return {"ok": True}
 
 
@@ -135,8 +224,22 @@ async def list_employees():
 @api_router.post("/employees", response_model=Employee)
 async def create_employee(payload: EmployeeCreate):
     emp = Employee(name=payload.name.strip(), avatar_url=payload.avatar_url)
-    await db.employees.insert_one(emp.dict())
+    doc = emp.dict()
+    doc["pin_hash"] = hash_pin(payload.pin or DEFAULT_EMPLOYEE_PIN)
+    await db.employees.insert_one(doc)
     return emp
+
+
+@api_router.post("/employees/{employee_id}/pin")
+async def set_employee_pin(employee_id: str, payload: SetEmployeePin):
+    await require_admin_pin(payload.admin_pin)
+    res = await db.employees.update_one(
+        {"id": employee_id, "deleted_at": None},
+        {"$set": {"pin_hash": hash_pin(payload.new_pin)}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Pegawai tidak ditemukan")
+    return {"ok": True}
 
 
 @api_router.delete("/employees/{employee_id}")
@@ -379,10 +482,26 @@ async def seed_data():
         names = ["Andi Saputra", "Siti Rahayu", "Budi Santoso", "Dewi Lestari"]
         for i, name in enumerate(names):
             emp = Employee(name=name, avatar_url=SEED_AVATARS[i % len(SEED_AVATARS)])
-            await db.employees.insert_one(emp.dict())
+            doc = emp.dict()
+            doc["pin_hash"] = hash_pin(DEFAULT_EMPLOYEE_PIN)
+            await db.employees.insert_one(doc)
     if await db.activities.count_documents({}) == 0:
         for name in ["Rapat Klien", "Survei Lapangan", "Pelatihan Eksternal", "Kunjungan Dinas"]:
             await db.activities.insert_one(Activity(name=name).dict())
+
+    # Bootstrap admin PIN into settings/auth (only if it does not exist yet).
+    if await db.settings.find_one({"_id": "auth"}) is None:
+        await db.settings.insert_one({
+            "_id": "auth",
+            "admin_pin_hash": hash_pin(ADMIN_PIN),
+            "updated_at": now_iso(),
+        })
+
+    # Migration: give any employee without a PIN the default PIN so they can log in.
+    async for emp in db.employees.find({"pin_hash": {"$exists": False}}, {"_id": 1}):
+        await db.employees.update_one(
+            {"_id": emp["_id"]}, {"$set": {"pin_hash": hash_pin(DEFAULT_EMPLOYEE_PIN)}}
+        )
 
 
 app.include_router(api_router)

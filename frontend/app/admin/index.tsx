@@ -1,12 +1,14 @@
 import { Feather } from "@react-native-vector-icons/feather";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, type Status } from "@/src/api";
 import { useAuth } from "@/src/auth";
 import { ActivityCard, LeaveCard } from "@/src/components/cards";
+import { PinDialog } from "@/src/components/pin-dialog";
 import { useToast } from "@/src/components/toast";
 import { EmptyState } from "@/src/components/ui";
 import { makeStyles, useTheme } from "@/src/theme";
@@ -19,8 +21,18 @@ export default function AdminPending() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const toast = useToast();
+  const [pinOpen, setPinOpen] = useState(false);
 
   const query = useQuery({ queryKey: ["pending"], queryFn: api.getPending });
+
+  const changePin = useMutation({
+    mutationFn: (v: Record<string, string>) => api.changeAdminPin(v.current, v.next),
+    onSuccess: () => {
+      setPinOpen(false);
+      toast("PIN admin diperbarui", "success");
+    },
+    onError: (e: any) => toast(e.message, "error"),
+  });
 
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ["pending"] });
@@ -61,9 +73,14 @@ export default function AdminPending() {
             <Text style={styles.title}>Persetujuan</Text>
             <Text style={styles.subtitle}>{total} pengajuan menunggu</Text>
           </View>
-          <Pressable style={styles.logout} onPress={signOut} testID="logout-button">
-            <Feather name="log-out" size={18} color={colors.onSurface} />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable style={styles.iconBtn} onPress={() => setPinOpen(true)} testID="admin-settings-button">
+              <Feather name="key" size={18} color={colors.onSurface} />
+            </Pressable>
+            <Pressable style={styles.iconBtn} onPress={signOut} testID="logout-button">
+              <Feather name="log-out" size={18} color={colors.onSurface} />
+            </Pressable>
+          </View>
         </View>
         <View style={styles.quickRow}>
           <Pressable style={styles.quickBtn} onPress={() => router.push("/izin-form")} testID="admin-add-izin">
@@ -118,6 +135,20 @@ export default function AdminPending() {
           />
         ))}
       </ScrollView>
+
+      <PinDialog
+        visible={pinOpen}
+        title="Ubah PIN Admin"
+        subtitle="Masukkan PIN saat ini lalu PIN baru (4-12 digit)."
+        fields={[
+          { key: "current", label: "PIN Saat Ini" },
+          { key: "next", label: "PIN Baru" },
+        ]}
+        submitLabel="Perbarui"
+        loading={changePin.isPending}
+        onSubmit={(v) => changePin.mutate(v)}
+        onClose={() => setPinOpen(false)}
+      />
     </View>
   );
 }
@@ -133,9 +164,10 @@ const useStyles = makeStyles((colors) => ({
     gap: 14,
   },
   headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  headerActions: { flexDirection: "row", gap: 10 },
   title: { fontSize: 24, color: colors.onSurface, fontWeight: "500" },
   subtitle: { fontSize: 14, color: colors.muted, marginTop: 2 },
-  logout: {
+  iconBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,

@@ -1,11 +1,14 @@
 import { Feather } from "@react-native-vector-icons/feather";
-import { Tabs } from "expo-router";
+import { Redirect, Tabs } from "expo-router";
 import { Platform } from "react-native";
 
+import { useAuth } from "@/src/auth";
 import { useTheme } from "@/src/theme";
 
 export default function EmployeeLayout() {
   const { colors } = useTheme();
+  const { session, ready } = useAuth();
+  if (ready && session?.role !== "employee") return <Redirect href="/" />;
   return (
     <Tabs
       screenOptions={{

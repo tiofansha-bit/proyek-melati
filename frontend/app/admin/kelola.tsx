@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api } from "@/src/api";
+import { PinDialog } from "@/src/components/pin-dialog";
 import { useToast } from "@/src/components/toast";
 import { Avatar, Button, EmptyState, Segmented } from "@/src/components/ui";
 import { makeStyles, useTheme } from "@/src/theme";
@@ -27,6 +28,7 @@ export default function Kelola() {
   const toast = useToast();
   const [tab, setTab] = useState<Tab>("employees");
   const [input, setInput] = useState("");
+  const [pinTarget, setPinTarget] = useState<{ id: string; name: string } | null>(null);
 
   const empQuery = useQuery({ queryKey: ["employees"], queryFn: api.listEmployees });
   const actQuery = useQuery({ queryKey: ["activities"], queryFn: api.listActivities });
@@ -66,6 +68,14 @@ export default function Kelola() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["activities"] });
       toast("Kegiatan dihapus", "success");
+    },
+    onError: (e: any) => toast(e.message, "error"),
+  });
+  const resetPin = useMutation({
+    mutationFn: (v: { id: string; pin: string }) => api.setEmployeePin(v.id, v.pin),
+    onSuccess: () => {
+      setPinTarget(null);
+      toast("PIN pegawai diperbarui", "success");
     },
     onError: (e: any) => toast(e.message, "error"),
   });
@@ -129,6 +139,15 @@ export default function Kelola() {
                 </View>
               )}
               <Text style={styles.name}>{item.name}</Text>
+              {isEmp ? (
+                <Pressable
+                  style={styles.pinBtn}
+                  onPress={() => setPinTarget({ id: item.id, name: item.name })}
+                  testID={`reset-pin-${item.id}`}
+                >
+                  <Feather name="key" size={18} color={colors.brandPrimary} />
+                </Pressable>
+              ) : null}
               <Pressable
                 style={styles.delBtn}
                 onPress={() => (isEmp ? delEmp.mutate(item.id) : delAct.mutate(item.id))}
@@ -161,6 +180,17 @@ export default function Kelola() {
           />
         </View>
       </KeyboardAvoidingView>
+
+      <PinDialog
+        visible={!!pinTarget}
+        title="Atur PIN Pegawai"
+        subtitle={pinTarget ? `Setel PIN baru untuk ${pinTarget.name} (4-12 digit).` : undefined}
+        fields={[{ key: "pin", label: "PIN Baru" }]}
+        submitLabel="Simpan"
+        loading={resetPin.isPending}
+        onSubmit={(v) => pinTarget && resetPin.mutate({ id: pinTarget.id, pin: v.pin })}
+        onClose={() => setPinTarget(null)}
+      />
     </View>
   );
 }
@@ -195,6 +225,14 @@ const useStyles = makeStyles((colors) => ({
     justifyContent: "center",
   },
   name: { flex: 1, fontSize: 15, color: colors.onSurface, fontWeight: "500" },
+  pinBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: colors.brandTertiary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   delBtn: {
     width: 40,
     height: 40,

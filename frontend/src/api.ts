@@ -1,4 +1,8 @@
+import { storage } from "@/src/utils/storage";
+
 const BASE = process.env.EXPO_PUBLIC_BACKEND_URL;
+
+export const ADMIN_PIN_KEY = "admin_pin";
 
 function qs(params?: Record<string, string | number | undefined>): string {
   if (!params) return "";
@@ -84,9 +88,35 @@ export const api = {
       body: JSON.stringify({ pin }),
     }),
 
+  employeeLogin: (employee_id: string, pin: string) =>
+    request<{ role: string; employee_id: string; name: string; avatar_url?: string | null }>(
+      "/employee/login",
+      { method: "POST", body: JSON.stringify({ employee_id, pin }) },
+    ),
+
+  changeAdminPin: async (current_pin: string, new_pin: string) => {
+    const r = await request<{ ok: boolean }>("/admin/change-pin", {
+      method: "POST",
+      body: JSON.stringify({ admin_pin: current_pin, new_pin }),
+    });
+    await storage.secureSet(ADMIN_PIN_KEY, new_pin);
+    return r;
+  },
+
+  setEmployeePin: async (employee_id: string, new_pin: string) => {
+    const admin_pin = (await storage.secureGet<string>(ADMIN_PIN_KEY, "")) ?? "";
+    return request<{ ok: boolean }>(`/employees/${employee_id}/pin`, {
+      method: "POST",
+      body: JSON.stringify({ admin_pin, new_pin }),
+    });
+  },
+
   listEmployees: () => request<Employee[]>("/employees"),
-  createEmployee: (name: string) =>
-    request<Employee>("/employees", { method: "POST", body: JSON.stringify({ name }) }),
+  createEmployee: (name: string, pin?: string) =>
+    request<Employee>("/employees", {
+      method: "POST",
+      body: JSON.stringify({ name, pin }),
+    }),
   deleteEmployee: (id: string) => request(`/employees/${id}`, { method: "DELETE" }),
 
   listActivities: () => request<Activity[]>("/activities"),
